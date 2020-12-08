@@ -100,22 +100,22 @@ func (f *FileWatcher) WalkDir() error {
 	return err
 }
 
-func (f *FileWatcher) Run() error {
+func (f *FileWatcher) Run() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	err := f.WalkDir()
 	if err != nil {
-		return err
+		// log error
 	}
 
 	for {
 		select {
 		case <-f.ctx.Done():
-			return nil
+			return
 		case <-ticker.C:
 			err := f.WalkDir()
 			if err != nil {
-				return err
+				// log error
 			}
 		}
 	}

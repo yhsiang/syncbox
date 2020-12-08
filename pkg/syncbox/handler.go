@@ -25,14 +25,6 @@ func (h *syncHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		server:  h.server,
 	}
 
-	// conn.pubsub = h.server.redis.Subscribe(GeneralChannel)
-	// if _, err := conn.pubsub.Receive(); err != nil {
-	// 	h.server.EmitError(err)
-	// 	return
-	// }
-
-	go conn.run(ctx)
-
 	if err := conn.read(ctx); err != nil {
 		if websocket.IsUnexpectedCloseError(err, websocket.CloseNoStatusReceived, websocket.CloseAbnormalClosure) {
 			return

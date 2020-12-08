@@ -2,15 +2,19 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/yhsiang/syncbox/pkg/syncbox"
+	"github.com/yhsiang/syncbox/pkg/util"
 )
 
+var serverUrl = strings.Join([]string{"ws://", ServerAddr, "/"}, "")
+
 var (
-	serverCmd = &cobra.Command{
+	clientCmd = &cobra.Command{
 		Use:   "syncbox",
 		Short: "syncbox is a dropbox-like client",
 		Long:  `syncbox is dropbox-like client to sync your files to syncbox server.`,
@@ -23,19 +27,16 @@ var (
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			watcher := syncbox.NewFileWatcher(ctx, args[0])
-			watcher.OnChange(func(files []syncbox.File) {
-				for _, file := range files {
-					fmt.Printf("%+v\n", file)
-				}
-				fmt.Println("=========")
-			})
+			fileWatcher := syncbox.NewFileWatcher(ctx, args[0])
+			client := syncbox.NewSyncClient(serverUrl, fileWatcher)
+			fileWatcher.OnChange(client.EmitFileChange)
 
-			err := watcher.Run()
-			if err != nil {
-				return err
-			}
+			client.Connect(ctx)
+			defer client.Disconnect()
 
+			go fileWatcher.Run()
+
+			util.WaitSignals(ctx, syscall.SIGINT, syscall.SIGTERM)
 			return nil
 		},
 	}
@@ -43,8 +44,8 @@ var (
 
 // Execute executes the root command.
 func ExecuteClientCmd() error {
-	serverCmd.SetUsageTemplate(`syncbox [directory path] e.g., synbox /tmp/dropbox/server`)
-	return serverCmd.Execute()
+	clientCmd.SetUsageTemplate(`syncbox [directory path] e.g., synbox /tmp/dropbox/server`)
+	return clientCmd.Execute()
 }
 
 func init() {

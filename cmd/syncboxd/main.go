@@ -1,9 +1,9 @@
 package main
 
-// import (
-// 	"github.com/yhsiang/syncbox/pkg/syncbox/cmd"
-// )
+import (
+	"github.com/yhsiang/syncbox/pkg/syncbox/cmd"
+)
 
-// func main() {
-// 	// cmd.ExecuteServerCmd()
-// }
+func main() {
+	cmd.ExecuteServerCmd()
+}

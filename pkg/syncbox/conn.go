@@ -14,27 +14,6 @@ type SyncConnection struct {
 	server  *SyncServer
 }
 
-func (c *SyncConnection) run(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-			// case msg, ok := <-c.pubsub.Channel():
-			// 	if !ok {
-			// 		continue
-			// 	}
-
-			// 	c.mu.Lock()
-			// 	err := c.WriteMessage(websocket.TextMessage, []byte(msg.Payload))
-			// 	c.mu.Unlock()
-			// 	if err != nil {
-			// 		c.server.EmitError(err)
-			// 	}
-		}
-	}
-}
-
 // read handles messages from client and send it to messageCallbacks of server.
 func (c *SyncConnection) read(ctx context.Context) error {
 	for {
@@ -53,6 +32,6 @@ func (c *SyncConnection) read(ctx context.Context) error {
 			continue
 		}
 
-		// c.server.EmitMessage(c, message)
+		c.server.EmitMessage(c, message)
 	}
 }
