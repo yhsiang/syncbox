@@ -2,6 +2,7 @@ package syncbox
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -34,4 +35,20 @@ func (c *SyncConnection) read(ctx context.Context) error {
 
 		c.server.EmitMessage(c, message)
 	}
+}
+
+func (c *SyncConnection) WriteJSON(data interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	msg, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	if err := c.WriteMessage(websocket.TextMessage, msg); err != nil {
+		return err
+	}
+
+	return nil
 }

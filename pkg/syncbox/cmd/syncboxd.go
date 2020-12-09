@@ -25,23 +25,10 @@ var (
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			server := syncbox.NewSyncServer(ctx, ServerAddr)
-			server.OnMessage(func(conn *syncbox.SyncConnection, message []byte) {
-				fmt.Println(string(message))
-			})
+			fileWatcher := syncbox.NewFileWatcher(ctx, args[0])
+			server := syncbox.NewServer(ctx, ServerAddr, fileWatcher)
 
-			// watcher := syncbox.NewFileWatcher(ctx, args[0])
-			// watcher.OnChange(func(files []syncbox.File) {
-			// 	for _, file := range files {
-			// 		fmt.Printf("%+v\n", file)
-			// 	}
-			// 	fmt.Println("=========")
-			// })
-
-			// err := watcher.Run()
-			// if err != nil {
-			// 	return err
-			// }
+			go fileWatcher.Run()
 
 			fmt.Printf("server listen on %s\n", ServerAddr)
 			return server.ListenAndServe()

@@ -2,29 +2,45 @@ package syncbox
 
 import (
 	"context"
-	"net/http"
+	"encoding/json"
+	"fmt"
+	"strings"
 )
 
-//go:generate callbackgen -type SyncServer
-type SyncServer struct {
-	*http.Server
+var Host = "localhost"
+var Port = "3000"
+var WsUrl = strings.Join([]string{"ws://", Host, ":", Port}, "")
+var ServerUrl = strings.Join([]string{"http://", Host, ":", Port}, "")
 
-	messageCallbacks []func(conn *SyncConnection, message []byte)
-	// uploadCallbacks []
-}
+func NewServer(ctx context.Context, addr string, fileWatcher *FileWatcher) *SyncServer {
+	server := NewSyncServer(ctx, addr, fileWatcher)
+	server.OnMessage(func(conn *SyncConnection, message []byte) {
+		var msg Message
+		fmt.Printf("%s\n", message)
+		err := json.Unmarshal(message, &msg)
+		if err != nil {
+			// log error
+			fmt.Println(err)
+		}
 
-func NewSyncServer(ctx context.Context, addr string) *SyncServer {
-	var server = &SyncServer{
-		Server: &http.Server{
-			Addr: addr,
-		},
-	}
+		switch msg.Command {
+		case "syn":
+			fmt.Printf("%s\n", message)
+			files := fileWatcher.Compare(msg.Files)
+			conn.WriteJSON(Message{
+				Command: "ack",
+				Files:   files,
+			})
+		}
 
-	var mux = http.NewServeMux()
-	mux.Handle("/", &syncHandler{
-		context: ctx,
-		server:  server,
 	})
-	server.Server.Handler = mux
+
+	fileWatcher.OnChange(func(files []File) {
+		for _, file := range files {
+			fmt.Printf("%+v\n", file)
+		}
+		fmt.Println("=========")
+	})
+
 	return server
 }
