@@ -4,28 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+
+	"github.com/apex/log"
 )
 
 var Host = "localhost"
 var Port = "3000"
-var WsUrl = strings.Join([]string{"ws://", Host, ":", Port}, "")
-var ServerUrl = strings.Join([]string{"http://", Host, ":", Port}, "")
+var WsUrl = fmt.Sprintf("ws://%s:%s", Host, Port)
+var ServerUrl = fmt.Sprintf("http://%s:%s", Host, Port)
 
 func NewServer(ctx context.Context, addr string, fileWatcher *FileWatcher) *SyncServer {
 	server := NewSyncServer(ctx, addr, fileWatcher)
 	server.OnMessage(func(conn *SyncConnection, message []byte) {
+		log.Infof("receive message %s", message)
 		var msg Message
-		fmt.Printf("%s\n", message)
 		err := json.Unmarshal(message, &msg)
 		if err != nil {
-			// log error
-			fmt.Println(err)
+			log.WithError(err).Error("failed to decode json")
 		}
 
 		switch msg.Command {
 		case "syn":
-			fmt.Printf("%s\n", message)
 			files := fileWatcher.Compare(msg.Files)
 			conn.WriteJSON(Message{
 				Command: "ack",
@@ -36,10 +35,7 @@ func NewServer(ctx context.Context, addr string, fileWatcher *FileWatcher) *Sync
 	})
 
 	fileWatcher.OnChange(func(files []File) {
-		for _, file := range files {
-			fmt.Printf("%+v\n", file)
-		}
-		fmt.Println("=========")
+		log.Infof("file changed %+v", files)
 	})
 
 	return server

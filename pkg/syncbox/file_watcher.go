@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,15 +13,18 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/google/uuid"
 )
+
+type ID string
 
 //go:generate callbackgen -type FileWatcher
 type FileWatcher struct {
-	mu    sync.Mutex
-	path  string
-	ctx   context.Context
-	files map[string]File
-
+	mu              sync.Mutex
+	path            string
+	ctx             context.Context
+	files           map[string]File
+	downloads       map[ID]File
 	changeCallbacks []func(files []File)
 }
 
@@ -32,12 +36,11 @@ type File struct {
 	State    string    `json:"-"`
 	Action   string    `json:"action"`
 	Content  io.Reader `json:"-"`
-	// isDirectory bool
-	// Size        int64
+	ID       ID        `json:"id"`
 }
 
 func (f *File) CalChecksum() error {
-	file, err := os.Open(strings.Join([]string{f.RootPath, f.Path}, ""))
+	file, err := os.Open(fmt.Sprintf("%s%s", f.RootPath, f.FullName()))
 	if err != nil {
 		return err
 	}
@@ -53,6 +56,21 @@ func (f *File) CalChecksum() error {
 	return nil
 }
 
+func (f *File) FullName() string {
+	return fmt.Sprintf("%s%s", f.Path, f.Name)
+}
+
+type FileSlice []File
+
+func (files FileSlice) toMap() map[string]File {
+	var maps = make(map[string]File)
+	for _, file := range files {
+		maps[file.FullName()] = file
+	}
+
+	return maps
+}
+
 func (f *FileWatcher) WalkDir() error {
 	var changes []File
 	var newFiles = make(map[string]File)
@@ -65,11 +83,14 @@ func (f *FileWatcher) WalkDir() error {
 		}
 
 		if !info.IsDir() {
-			var cuttedPath = strings.Replace(path, f.path, "", 1)
+			var fileName = info.Name()
+			var pathFileName = strings.Replace(path, f.path, "", 1)
+			var pathOnly = strings.Replace(pathFileName, fileName, "", 1)
 			file := File{
-				Name:     info.Name(),
+				Name:     fileName,
 				RootPath: f.path,
-				Path:     cuttedPath,
+				Path:     pathOnly,
+				ID:       ID(uuid.New().String()),
 			}
 
 			err2 := file.CalChecksum()
@@ -78,7 +99,7 @@ func (f *FileWatcher) WalkDir() error {
 			}
 
 			log.Debugf("%+v", file)
-			newFiles[file.Path] = file
+			newFiles[file.FullName()] = file
 		}
 
 		return nil
@@ -88,7 +109,7 @@ func (f *FileWatcher) WalkDir() error {
 	defer f.mu.Unlock()
 
 	for _, oldFile := range f.files {
-		newFile, ok := newFiles[oldFile.Path]
+		newFile, ok := newFiles[oldFile.FullName()]
 		if !ok {
 			oldFile.State = "delete"
 			changes = append(changes, oldFile)
@@ -101,10 +122,12 @@ func (f *FileWatcher) WalkDir() error {
 	}
 
 	for _, newFile := range newFiles {
-		if _, ok := f.files[newFile.Path]; !ok {
+		if _, ok := f.files[newFile.FullName()]; !ok {
 			newFile.State = "new"
 			changes = append(changes, newFile)
 		}
+
+		f.downloads[newFile.ID] = newFile
 	}
 
 	f.files = newFiles
@@ -137,25 +160,43 @@ func (f *FileWatcher) Run() {
 	}
 }
 
-func (f *FileWatcher) Compare(files []File) []File {
+func (f *FileWatcher) Compare(files FileSlice) FileSlice {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	var syncingFiles []File
+	var syncingFiles = FileSlice{} // avoid null
 	for _, file := range files {
-		if _, ok := f.files[file.Path]; !ok {
+		if _, ok := f.files[file.FullName()]; !ok {
 			file.Action = "upload"
 			syncingFiles = append(syncingFiles, file)
 		}
 	}
-	// TODO: handle downloading
+
+	var maps = files.toMap()
+	log.Infof("maps %+v", maps)
+	for key, file := range f.files {
+		if _, ok := maps[key]; !ok {
+			log.Infof("file %+v", file)
+			file.Action = "download"
+			syncingFiles = append(syncingFiles, file)
+		}
+	}
+
 	return syncingFiles
+}
+
+func (f *FileWatcher) Set(file File) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.files[file.FullName()] = file
 }
 
 func NewFileWatcher(ctx context.Context, path string) *FileWatcher {
 	return &FileWatcher{
-		path:  path,
-		ctx:   ctx,
-		files: make(map[string]File),
+		path:      path,
+		ctx:       ctx,
+		files:     make(map[string]File),
+		downloads: make(map[ID]File),
 	}
 }

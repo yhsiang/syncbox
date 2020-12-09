@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	"strings"
+	"fmt"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -11,7 +11,7 @@ import (
 	"github.com/yhsiang/syncbox/pkg/util"
 )
 
-var serverUrl = strings.Join([]string{"ws://", ServerAddr, "/"}, "")
+var serverUrl = fmt.Sprintf("ws://%s/", ServerAddr)
 
 var (
 	clientCmd = &cobra.Command{
