@@ -13,3 +13,13 @@ func (S *SyncServer) EmitMessage(conn *SyncConnection, message []byte) {
 		cb(conn, message)
 	}
 }
+
+func (S *SyncServer) OnBinaryMessage(cb func(conn *SyncConnection, message []byte)) {
+	S.binaryMessageCallbacks = append(S.binaryMessageCallbacks, cb)
+}
+
+func (S *SyncServer) EmitBinaryMessage(conn *SyncConnection, message []byte) {
+	for _, cb := range S.binaryMessageCallbacks {
+		cb(conn, message)
+	}
+}

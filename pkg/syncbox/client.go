@@ -1,6 +1,7 @@
 package syncbox
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -55,7 +56,8 @@ func (s *SyncClient) Connect(ctx context.Context) {
 			for _, file := range msg.Files {
 				switch file.Action {
 				case "upload":
-					err := s.uploadFile(file)
+					// err := s.uploadFile(file)
+					err := s.upload(file)
 					if err != nil {
 						log.WithError(err).Error("failed to upload")
 					}
@@ -89,6 +91,50 @@ func (s *SyncClient) Connect(ctx context.Context) {
 
 func (s *SyncClient) Disconnect() {
 	s.client.Close()
+}
+
+type UploadRequest struct {
+	info   File
+	chunks []byte
+}
+
+func (s *SyncClient) upload(file File) error {
+	fileData, err := os.Open(fmt.Sprintf("%s%s", s.fileWatcher.path, file.FullName()))
+	if err != nil {
+		return err
+	}
+	defer fileData.Close()
+
+	reader := bufio.NewReader(fileData)
+	buffer := make([]byte, 1024)
+
+	for {
+		n, err := reader.Read(buffer)
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return err
+		}
+
+		// req := &pb.UploadImageRequest{
+		// 	Data: &pb.UploadImageRequest_ChunkData{
+		// 		ChunkData: buffer[:n],
+		// 	},
+		// }
+
+		// req := &UploadRequest{
+		// 	info: file,
+		// 	chunks: buffer[:n],
+		// }
+
+		err = s.client.Write(buffer[:n])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *SyncClient) uploadFile(file File) error {

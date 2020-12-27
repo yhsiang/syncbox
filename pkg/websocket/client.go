@@ -279,6 +279,32 @@ func (c *WebSocketClient) WriteJSON(v interface{}) error {
 	return err2
 }
 
+func (c *WebSocketClient) Write(p []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.connected {
+		return ErrConnectionLost
+	}
+
+	if err := c.conn.WriteMessage(websocket.BinaryMessage, p); err != nil {
+		return err
+	}
+
+	return nil
+	// w, err := c.conn.NextWriter(websocket.BinaryMessage)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// err1 := json.NewEncoder(w).Encode(v)
+	// err2 := w.Close()
+	// if err1 != nil {
+	// 	return err1
+	// }
+	// return err2
+}
+
 func (c *WebSocketClient) WriteTextMessage(message []byte) error {
 	return c.WriteMessage(websocket.TextMessage, message)
 }

@@ -24,7 +24,7 @@ func (c *SyncConnection) read(ctx context.Context) error {
 		default:
 		}
 
-		_, message, err := c.ReadMessage()
+		messageType, message, err := c.ReadMessage()
 		if err != nil {
 			return err
 		}
@@ -32,8 +32,12 @@ func (c *SyncConnection) read(ctx context.Context) error {
 		if len(message) == 0 {
 			continue
 		}
-
-		c.server.EmitMessage(c, message)
+		switch messageType {
+		case websocket.BinaryMessage:
+			c.server.EmitBinaryMessage(c, message)
+		case websocket.TextMessage:
+			c.server.EmitMessage(c, message)
+		}
 	}
 }
 

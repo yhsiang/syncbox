@@ -9,7 +9,8 @@ import (
 type SyncServer struct {
 	*http.Server
 
-	messageCallbacks []func(conn *SyncConnection, message []byte)
+	messageCallbacks       []func(conn *SyncConnection, message []byte)
+	binaryMessageCallbacks []func(conn *SyncConnection, message []byte)
 	// uploadCallbacks []
 }
 
